@@ -110,44 +110,91 @@ export default function App() {
     return getNotifications();
   });
 
+  const mergeTrips = React.useCallback((existingTrips: Trip[], incomingTrips: Trip[]) => {
+    const byId = new Map<string, Trip>();
+
+    const normalizeTrip = (trip: Trip): Trip => ({
+      ...trip,
+      expenses: trip.expenses || [],
+      hotels: trip.hotels || [],
+      restaurants: trip.restaurants || [],
+      itinerary: trip.itinerary || [],
+      flights: trip.flights || [],
+      aiRecommendations: trip.aiRecommendations || [],
+      budgetAllocation: trip.budgetAllocation || [],
+      packingTips: trip.packingTips || [],
+      savingTips: trip.savingTips || [],
+      safetyTips: trip.safetyTips || [],
+      trains: trip.trains || [],
+      buses: trip.buses || []
+    });
+
+    [...incomingTrips, ...existingTrips].forEach((trip) => {
+      const normalizedTrip = normalizeTrip(trip);
+      const existing = byId.get(normalizedTrip.id);
+      if (!existing) {
+        byId.set(normalizedTrip.id, normalizedTrip);
+        return;
+      }
+
+      byId.set(normalizedTrip.id, {
+        ...existing,
+        ...normalizedTrip,
+        itinerary: normalizedTrip.itinerary?.length ? normalizedTrip.itinerary : existing.itinerary,
+        expenses: normalizedTrip.expenses?.length ? normalizedTrip.expenses : existing.expenses,
+        hotels: normalizedTrip.hotels?.length ? normalizedTrip.hotels : existing.hotels,
+        restaurants: normalizedTrip.restaurants?.length ? normalizedTrip.restaurants : existing.restaurants,
+      });
+    });
+
+    return Array.from(byId.values()).sort((a, b) => {
+      const aTime = new Date(a.createdAt || 0).getTime();
+      const bTime = new Date(b.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
+  }, []);
+
+  const syncTripsToSupabase = React.useCallback(async (tripList: Trip[], userId: string) => {
+    console.log("Syncing Trips to Supabase", { userId, tripCount: tripList.length });
+    for (const trip of tripList) {
+      try {
+        await TripService.saveTrip(userId, trip);
+        console.log("Trip Saved", { userId, tripId: trip.id });
+      } catch (error) {
+        console.error("Failed to sync trip to Supabase:", error);
+      }
+    }
+  }, []);
+
   // 1. Load data synchronized with Supabase Auth context
   React.useEffect(() => {
     let active = true;
     async function loadData() {
+      const persistedTrips = getTrips();
+      console.log("Trips Loaded", persistedTrips);
+
       if (currentUser) {
         try {
+          console.log("Current User", currentUser);
           const dbTrips = await TripService.getTrips(currentUser.id);
+          console.log("Supabase Response", { userId: currentUser.id, dbTrips });
+
+          const mergedTrips = mergeTrips(persistedTrips, dbTrips);
           if (active) {
-            setTrips(dbTrips);
-            
-            // Determine active trip to restore
-            let restoredTrip: Trip | null = null;
-            
-            // Try Supabase profile preferences first
-            try {
-              const profile = await ProfileService.getProfile(currentUser.id);
-              const activeTripIdFromPrefs = profile?.preferences?.activeTripId;
-              
-              if (activeTripIdFromPrefs && dbTrips.length > 0) {
-                restoredTrip = dbTrips.find(t => t.id === activeTripIdFromPrefs) || null;
-              }
-            } catch (err) {
-              console.warn("Could not load active trip ID from profile preferences:", err);
-            }
-            
-            // If not found in profile preferences, try localStorage fallback
-            if (!restoredTrip) {
-              const localActiveId = localStorage.getItem("voyage_active_trip_id");
-              if (localActiveId && dbTrips.length > 0) {
-                restoredTrip = dbTrips.find(t => t.id === localActiveId) || null;
-              }
-            }
-            
-            // If still no active trip, fallback to latest created trip (index 0)
-            if (!restoredTrip && dbTrips.length > 0) {
-              restoredTrip = dbTrips[0];
-            }
-            
+            setTrips(mergedTrips);
+            saveTrips(mergedTrips);
+          }
+
+          let restoredTrip: Trip | null = null;
+          const storedActiveId = localStorage.getItem("voyage_active_trip_id");
+          if (storedActiveId) {
+            restoredTrip = mergedTrips.find((trip) => trip.id === storedActiveId) || null;
+          }
+          if (!restoredTrip && mergedTrips.length > 0) {
+            restoredTrip = mergedTrips[0];
+          }
+
+          if (active) {
             setActiveTrip(restoredTrip);
             if (restoredTrip) {
               localStorage.setItem("voyage_active_trip_id", restoredTrip.id);
@@ -155,7 +202,11 @@ export default function App() {
               localStorage.removeItem("voyage_active_trip_id");
             }
           }
-          
+
+          if (mergedTrips.length > 0) {
+            await syncTripsToSupabase(mergedTrips, currentUser.id);
+          }
+
           // Load user notifications from backend
           const response = await fetch(`${API_BASE}/api/notifications`, {
             headers: { "Authorization": `Bearer ${authToken}` }
@@ -170,8 +221,9 @@ export default function App() {
       } else {
         if (active) {
           const localTrips = getTrips();
+          console.log("Trips Loaded (guest mode)", localTrips);
           setTrips(localTrips);
-          
+
           let restoredTrip: Trip | null = null;
           const localActiveId = localStorage.getItem("voyage_active_trip_id");
           if (localActiveId && localTrips.length > 0) {
@@ -180,14 +232,14 @@ export default function App() {
           if (!restoredTrip && localTrips.length > 0) {
             restoredTrip = localTrips[0];
           }
-          
+
           setActiveTrip(restoredTrip);
           if (restoredTrip) {
             localStorage.setItem("voyage_active_trip_id", restoredTrip.id);
           } else {
             localStorage.removeItem("voyage_active_trip_id");
           }
-          
+
           setNotifications(getNotifications());
         }
       }
@@ -196,10 +248,11 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [currentUser, authToken]);
+  }, [currentUser, authToken, mergeTrips, syncTripsToSupabase]);
 
   // 2. CREATE TRIP GENERATOR CALLBACK
   const handleTripGenerated = async (newTrip: Trip) => {
+    console.log("Trip Generated", newTrip);
     const updated = [newTrip, ...trips];
     setTrips(updated);
     saveTrips(updated);
@@ -207,7 +260,12 @@ export default function App() {
 
     if (currentUser) {
       try {
+        console.log("Trip Saved", { userId: currentUser.id, trip: newTrip });
         await TripService.saveTrip(currentUser.id, newTrip);
+        const refreshedTrips = await TripService.getTrips(currentUser.id);
+        const mergedTrips = mergeTrips(updated, refreshedTrips);
+        setTrips(mergedTrips);
+        saveTrips(mergedTrips);
       } catch (error) {
         console.error("Failed to sync generated trip to Supabase:", error);
       }
@@ -232,6 +290,7 @@ export default function App() {
 
   // 3. DELETE TRIP
   const handleDeleteTrip = async (tripId: string) => {
+    console.log("Trip Deleted", { tripId });
     const updated = trips.filter(t => t.id !== tripId);
     setTrips(updated);
     saveTrips(updated);

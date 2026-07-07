@@ -6,7 +6,8 @@ export const TripService = {
    * Fetches all trips for the authenticated user and reconstructs the full Trip model
    */
   async getTrips(userId: string): Promise<Trip[]> {
-    // 1. Fetch user trips
+    console.log("Fetching Trips", { userId });
+
     const { data: tripsData, error: tripsErr } = await supabase
       .from("trips")
       .select("*")
@@ -14,9 +15,11 @@ export const TripService = {
       .order("created_at", { ascending: false });
 
     if (tripsErr) {
-      console.warn("User trips fetched locally / none synchronized:", tripsErr.message || tripsErr);
+      console.error("Failed to fetch trips from Supabase:", tripsErr);
       return [];
     }
+
+    console.log("Supabase Response", { userId, tripsData });
 
     if (!tripsData || tripsData.length === 0) return [];
 
@@ -87,6 +90,7 @@ export const TripService = {
       });
     }
 
+    console.log("Trips Loaded", { userId, trips });
     return trips;
   },
 
@@ -96,10 +100,11 @@ export const TripService = {
   async saveTrip(userId: string, trip: Trip): Promise<void> {
     const duration = Math.max(1, Math.round((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / (1000 * 3600 * 24)) + 1);
 
-    // 1. Insert Trip row
+    console.log("Saving Trip to Supabase", { userId, tripId: trip.id, destination: trip.destination });
+
     const { error: tripErr } = await supabase
       .from("trips")
-      .insert({
+      .upsert({
         id: trip.id,
         user_id: userId,
         destination: trip.destination,
@@ -117,11 +122,12 @@ export const TripService = {
         is_saved: trip.isSaved,
         is_favorite: trip.isFavorite,
         created_at: trip.createdAt || new Date().toISOString()
-      });
+      }, { onConflict: "id" });
 
     if (tripErr) throw tripErr;
 
-    // 2. Insert Itinerary detail
+    await supabase.from("itineraries").delete().eq("trip_id", trip.id);
+
     const { error: itinErr } = await supabase
       .from("itineraries")
       .insert({
@@ -147,10 +153,11 @@ export const TripService = {
 
     if (itinErr) throw itinErr;
 
-    // 3. Insert initial expenses if any
+    await supabase.from("expenses").delete().eq("trip_id", trip.id);
+
     if (trip.expenses && trip.expenses.length > 0) {
       for (const e of trip.expenses) {
-        await supabase.from("expenses").insert({
+        const { error: expErr } = await supabase.from("expenses").insert({
           id: e.id,
           trip_id: trip.id,
           title: e.title,
@@ -160,14 +167,19 @@ export const TripService = {
           date: e.date,
           description: e.description || null
         });
+
+        if (expErr) throw expErr;
       }
     }
+
+    console.log("Trip persisted successfully", { tripId: trip.id });
   },
 
   /**
    * Updates basic trip preferences
    */
   async updateTrip(userId: string, tripId: string, updates: Partial<Trip>): Promise<void> {
+    console.log("Updating Trip", { userId, tripId, updates });
     const dbUpdates: any = {};
     if (updates.isFavorite !== undefined) dbUpdates.is_favorite = updates.isFavorite;
     if (updates.isSaved !== undefined) dbUpdates.is_saved = updates.isSaved;
@@ -190,6 +202,7 @@ export const TripService = {
    * Deletes a trip (cascade deletes itineraries & expenses)
    */
   async deleteTrip(userId: string, tripId: string): Promise<void> {
+    console.log("Deleting Trip", { userId, tripId });
     const { error } = await supabase
       .from("trips")
       .delete()
@@ -203,6 +216,8 @@ export const TripService = {
    * Clones/duplicates a trip record
    */
   async duplicateTrip(userId: string, tripId: string): Promise<Trip> {
+    console.log("Duplicating Trip", { userId, tripId });
+
     // 1. Fetch original
     const { data: origTrip, error: fetchErr } = await supabase
       .from("trips")
