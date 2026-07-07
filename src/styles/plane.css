@@ -1,0 +1,253 @@
+/* styles/plane.css */
+
+.plane-container-new {
+  position: absolute;
+  bottom: calc(13% - 16px); /* Desktop default wheels align with runway */
+  left: 0;
+  width: 320px;
+  height: 110px;
+  pointer-events: none;
+  z-index: 5;
+  will-change: transform, opacity;
+  transform-origin: bottom left;
+}
+
+/* Responsive sizes */
+@media (max-width: 1024px) {
+  .plane-container-new {
+    width: 240px;
+    height: 85px;
+    bottom: calc(13% - 12.5px); /* Tablet wheels align with runway */
+  }
+}
+@media (max-width: 640px) {
+  .plane-container-new {
+    width: 160px;
+    height: 60px;
+    bottom: calc(13% - 9px); /* Mobile wheels align with runway */
+  }
+}
+
+/* 20 seconds continuous loop: active flight, glide, touchdown, taxi and reset */
+.plane-animated-new {
+  animation: plane-landing-path 20s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+
+/* Engine vibration and micro-motion */
+.plane-vibration-new {
+  animation: plane-vibe-new 0.1s linear infinite alternate;
+}
+
+/* Flashing navigation beacons */
+.beacon-blink-red-new {
+  animation: beacon-blink-red-kf 1.5s steps(1) infinite;
+}
+
+.beacon-blink-green-new {
+  animation: beacon-blink-green-kf 1.5s steps(1) infinite;
+}
+
+.beacon-blink-white-new {
+  animation: beacon-blink-white-kf 1s steps(1) infinite;
+}
+
+/* Touchdown smoke puff animation */
+.touchdown-smoke-new {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  background: rgba(240, 240, 240, 0.7);
+  border-radius: 50%;
+  filter: blur(5px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.smoke-puff-active-new {
+  animation: smoke-burst-new 1.5s ease-out forwards;
+}
+
+/* Plane Shadow - matches plane position exactly on the runway ground level */
+.plane-shadow-new {
+  position: absolute;
+  bottom: 13%;
+  left: 0;
+  width: 160px;
+  height: 5px;
+  background: rgba(15, 23, 42, 0.22);
+  border-radius: 50%;
+  filter: blur(4px);
+  pointer-events: none;
+  z-index: 4;
+  will-change: transform, opacity;
+  transform-origin: center center;
+  animation: plane-shadow-landing-path 20s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+
+@media (max-width: 1024px) {
+  .plane-shadow-new {
+    width: 120px;
+    height: 4px;
+  }
+}
+@media (max-width: 640px) {
+  .plane-shadow-new {
+    width: 80px;
+    height: 3px;
+  }
+}
+
+@keyframes plane-vibe-new {
+  0% { transform: translate3d(0, -0.4px, 0); }
+  100% { transform: translate3d(0, 0.4px, 0); }
+}
+
+@keyframes beacon-blink-red-kf {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 1; }
+}
+
+@keyframes beacon-blink-green-kf {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.15; }
+}
+
+@keyframes beacon-blink-white-kf {
+  0%, 100% { opacity: 0.2; }
+  25% { opacity: 1; }
+}
+
+@keyframes smoke-burst-new {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.4);
+    opacity: 0;
+  }
+  10% {
+    transform: translate3d(-15px, -3px, 0) scale(1.2);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(-50px, -8px, 0) scale(2.5);
+    opacity: 0;
+  }
+}
+
+/*
+  AIRPLANE LANDING LIFECYCLE (20s)
+  0% to 99% of timeline: Active curved approach, flare, glide, touchdown, taxi, and exit.
+  99% to 100% of timeline: Invisible instant reset back to the right horizon.
+  Note: Y translations are negative offsets from the baseline ground runway (bottom: 13%).
+*/
+@keyframes plane-landing-path {
+  0% {
+    transform: translate3d(100vw, -35vh, 0) scale(0.15) rotate(-8deg);
+    opacity: 0;
+  }
+  2% {
+    opacity: 1;
+  }
+  /* Curved Flight Path descent glide starts steep and flattens out */
+  25% {
+    transform: translate3d(65vw, -24vh, 0) scale(0.35) rotate(-7deg);
+    opacity: 1;
+  }
+  50% {
+    transform: translate3d(35vw, -12vh, 0) scale(0.6) rotate(-5deg);
+  }
+  /* Pre-touchdown flare: pilot pulls the nose up to slow descent and arrest speed */
+  70% {
+    transform: translate3d(12vw, -2vh, 0) scale(0.85) rotate(-2.5deg);
+  }
+  /* Smoothest touchdown at exactly 83% (16.6 seconds) */
+  83% {
+    transform: translate3d(0vw, 0px, 0) scale(0.98) rotate(-0.5deg);
+  }
+  /* Nose landing gear settles flat on the runway */
+  88% {
+    transform: translate3d(-8vw, 0px, 0) scale(1.02) rotate(0deg);
+  }
+  /* Rolling and taxiing down the runway */
+  95% {
+    transform: translate3d(-24vw, 0px, 0) scale(1.05) rotate(0deg);
+    opacity: 1;
+  }
+  /* Fades completely out behind terminal building/hangar silhouettes */
+  99% {
+    transform: translate3d(-36vw, 0px, 0) scale(1.05) rotate(0deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(100vw, -35vh, 0) scale(0.15) rotate(-8deg);
+    opacity: 0;
+  }
+}
+
+/* 
+  Shadow projection locked on the runway ground level (stays at Y = 0 baseline).
+  Follows the exact X-offset and scale of the landing aircraft.
+*/
+@keyframes plane-shadow-landing-path {
+  0% {
+    transform: translate3d(100vw, 0, 0) scale(0.12);
+    opacity: 0;
+  }
+  2% {
+    opacity: 0.05;
+  }
+  25% {
+    transform: translate3d(65vw, 0, 0) scale(0.25);
+    opacity: 0.08;
+    filter: blur(8px);
+  }
+  50% {
+    transform: translate3d(35vw, 0, 0) scale(0.48);
+    opacity: 0.15;
+    filter: blur(6px);
+  }
+  70% {
+    transform: translate3d(12vw, 0, 0) scale(0.78);
+    opacity: 0.35;
+    filter: blur(4px);
+  }
+  83% {
+    transform: translate3d(0vw, 0, 0) scale(0.95);
+    opacity: 0.55;
+    filter: blur(1.5px);
+  }
+  88% {
+    transform: translate3d(-8vw, 0, 0) scale(1.02);
+    opacity: 0.6;
+    filter: blur(1.2px);
+  }
+  95% {
+    transform: translate3d(-24vw, 0, 0) scale(1.05);
+    opacity: 0.6;
+    filter: blur(1.2px);
+  }
+  99% {
+    transform: translate3d(-36vw, 0, 0) scale(1.05);
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(100vw, 0, 0) scale(0.12);
+    opacity: 0;
+  }
+}
+
+/* Accessibility Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .plane-animated-new, .plane-shadow-new {
+    animation: none !important;
+  }
+  .plane-container-new {
+    transform: translate3d(15vw, 0, 0) scale(0.98) rotate(0deg) !important;
+    opacity: 0.95 !important;
+  }
+  .plane-shadow-new {
+    transform: translate3d(15vw, 0, 0) scale(0.95) !important;
+    opacity: 0.5 !important;
+  }
+  .plane-vibration-new, .beacon-blink-red-new, .beacon-blink-green-new, .beacon-blink-white-new {
+    animation: none !important;
+  }
+}

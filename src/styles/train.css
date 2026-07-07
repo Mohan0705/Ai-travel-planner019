@@ -1,0 +1,138 @@
+/* styles/train.css */
+
+.railway-track-container {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8%;
+  height: 35px;
+  pointer-events: none;
+  z-index: 12;
+}
+
+/* Realistic railway line with ties and steel rails */
+.railway-track-ties {
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  top: 45%;
+  height: 6px;
+  background-image: repeating-linear-gradient(90deg,
+    #5c4d3c 0px,
+    #5c4d3c 3px,
+    transparent 3px,
+    transparent 18px
+  );
+  opacity: 0.22;
+  transform: rotate(0.4deg);
+  transform-origin: left center;
+}
+
+.railway-track-steel {
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  top: 42%;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    rgba(203, 213, 225, 0) 0%, 
+    rgba(203, 213, 225, 0.6) 15%, 
+    rgba(203, 213, 225, 0.6) 85%, 
+    rgba(203, 213, 225, 0) 100%
+  );
+  box-shadow: 0 1px 1px rgba(255, 255, 255, 0.4);
+  transform: rotate(0.4deg);
+  transform-origin: left center;
+}
+
+.train-container-vande {
+  position: absolute;
+  top: -12px;
+  left: 0;
+  width: 480px;
+  height: 32px;
+  will-change: transform;
+}
+
+/* Responsive sizes for train */
+@media (max-width: 1024px) {
+  .train-container-vande {
+    width: 360px;
+    height: 26px;
+    top: -8px;
+  }
+}
+@media (max-width: 640px) {
+  .train-container-vande {
+    width: 250px;
+    height: 18px;
+    top: -3px;
+  }
+}
+
+/* Smooth continuous loop glide */
+.train-animated-vande {
+  animation: train-glide-kf 11s linear infinite;
+}
+
+/* Soft drop shadow trailing with the train */
+.train-shadow-vande {
+  position: absolute;
+  bottom: -5px;
+  left: 20px;
+  width: 440px;
+  height: 4px;
+  background: rgba(15, 23, 42, 0.14);
+  border-radius: 50%;
+  filter: blur(2.5px);
+  pointer-events: none;
+}
+
+/* Soft light glow for the high speed wind barrier */
+.train-motion-blur-vande {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -20px;
+  width: 50px;
+  background: linear-gradient(270deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.15) 100%);
+  filter: blur(1.5px);
+  pointer-events: none;
+}
+
+/* Realistic dual headlights beam */
+.train-headlights-beam {
+  position: absolute;
+  top: 6px;
+  right: -90px;
+  width: 100px;
+  height: 22px;
+  background: radial-gradient(ellipse at left, rgba(254, 240, 138, 0.2) 0%, rgba(254, 240, 138, 0.04) 50%, rgba(254, 240, 138, 0) 100%);
+  clip-path: polygon(0 40%, 100% 0, 100% 100%, 0 60%);
+  filter: blur(2.5px);
+  pointer-events: none;
+}
+
+/*
+  Vande Bharat continuous loop:
+  Travels left to right smoothly at 60fps with slightly angled track depth.
+*/
+@keyframes train-glide-kf {
+  0% {
+    transform: translate3d(-520px, -2px, 0) scale(0.85);
+  }
+  100% {
+    transform: translate3d(105vw, 4px, 0) scale(1.05);
+  }
+}
+
+/* Accessibility Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .train-animated-vande {
+    animation: none !important;
+  }
+  .train-container-vande {
+    transform: translate3d(20vw, 1px, 0) scale(0.95) !important;
+    opacity: 0.85 !important;
+  }
+}

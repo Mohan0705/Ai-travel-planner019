@@ -1,0 +1,8 @@
+{
+  "name": "AI Travel Planner",
+  "description": "An intelligent multi-agent travel planner and assistant that generates custom itineraries, manages budgets, tracks expenses, and provides real-time travel advice.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
