@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { Trip, DayPlan, Activity as ActivityType, HotelRecommendation, RestaurantRecommendation } from "../types";
 import MapboxMap from "./MapboxMap.tsx";
+import { formatPrice } from "../lib/currency.ts";
 
 interface ItineraryViewProps {
   trip: Trip | null;
@@ -336,7 +337,7 @@ export default function ItineraryView({ trip, onToggleFavorite, onAddExpense }: 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="p-5 rounded-2xl bg-white border border-earth-border space-y-1 shadow-sm">
           <span className="text-[10px] font-mono text-[#4A4A3A] uppercase font-medium">Cash Allocation</span>
-          <p className="text-xl font-serif italic text-[#4A4A3A] font-light">${trip.budget.toLocaleString()}</p>
+          <p className="text-xl font-serif italic text-[#4A4A3A] font-light">{formatPrice(trip.budget, trip.country)}</p>
           <div className="w-full h-1 bg-earth-light-sage rounded overflow-hidden mt-2">
             <div 
               className="h-full bg-earth-accent" 
@@ -347,14 +348,14 @@ export default function ItineraryView({ trip, onToggleFavorite, onAddExpense }: 
 
         <div className="p-5 rounded-2xl bg-white border border-earth-border space-y-1 shadow-sm">
           <span className="text-[10px] font-mono text-[#4A4A3A] uppercase font-medium">Aggressed Spending</span>
-          <p className="text-xl font-serif italic text-rose-600 font-light">${totalSpentAll.toLocaleString()}</p>
+          <p className="text-xl font-serif italic text-rose-600 font-light">{formatPrice(totalSpentAll, trip.country)}</p>
           <p className="text-[10px] text-earth-text/50 mt-1">Includes activities and ledger bills</p>
         </div>
 
         <div className="p-5 rounded-2xl bg-white border border-earth-border space-y-1 shadow-sm">
           <span className="text-[10px] font-mono text-[#4A4A3A] uppercase font-medium">Remaining Reserves</span>
           <p className="text-xl font-serif italic text-earth-sage font-medium">
-            ${Math.max(0, trip.budget - totalSpentAll).toLocaleString()}
+            {formatPrice(Math.max(0, trip.budget - totalSpentAll), trip.country)}
           </p>
           <p className="text-[10px] text-earth-text/50 mt-1">
             {totalSpentAll > trip.budget ? "Spending limit exceeded." : "Budget within target limit."}
@@ -399,6 +400,64 @@ export default function ItineraryView({ trip, onToggleFavorite, onAddExpense }: 
           {/* Timeline Col */}
           <div className="lg:col-span-7 space-y-6">
             
+            {trip.isMulticity && (
+              <div className="p-6 rounded-3xl bg-gradient-to-br from-[#FAF9F5] to-white border border-earth-accent/30 shadow-sm space-y-4">
+                <div className="flex justify-between items-center border-b border-earth-border pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">✨</span>
+                    <div>
+                      <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-earth-accent">AI Route Optimizer Active</h3>
+                      <p className="text-[10px] text-earth-text/50">Multi-destination tour sequence optimized using client TSP.</p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 rounded-full bg-earth-accent text-[10px] font-mono text-white">OPTIMIZED</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono text-earth-text/50 uppercase">Total Distance</span>
+                    <p className="text-sm font-semibold text-earth-dark">
+                      {trip.totalDistance ? `${trip.totalDistance.toFixed(1)} km` : "Calculated"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono text-earth-text/50 uppercase">Total Duration</span>
+                    <p className="text-sm font-semibold text-earth-dark">
+                      {trip.totalDuration || "Calculated"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono text-earth-text/50 uppercase">Transport Style</span>
+                    <p className="text-sm font-semibold text-earth-dark capitalize">
+                      {trip.transport}
+                    </p>
+                  </div>
+                </div>
+
+                {trip.segments && trip.segments.length > 0 && (
+                  <div className="space-y-2 border-t border-earth-border pt-3">
+                    <span className="text-[10px] font-mono text-earth-text/50 uppercase">Optimized Travel Segments</span>
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                      {trip.segments.map((seg: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center bg-[#F5F5F0]/50 p-2.5 rounded-xl border border-earth-border/40 text-xs">
+                          <div className="flex items-center gap-2 font-medium">
+                            <span className="font-mono text-[10px] text-[#4A4A3A]/60">#{idx + 1}</span>
+                            <span>{seg.from}</span>
+                            <span className="text-earth-accent">→</span>
+                            <span>{seg.to}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-semibold block text-earth-dark">{seg.distance ? `${seg.distance.toFixed(1)} km` : "Calculated"}</span>
+                            <span className="text-[9px] font-mono text-earth-text/50">{seg.transportSuggestion || "Flight / Train / Car"}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Day selection tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 border-b border-earth-border/60">
               {trip.itinerary.map((day, idx) => (
@@ -460,7 +519,7 @@ export default function ItineraryView({ trip, onToggleFavorite, onAddExpense }: 
 
                         <div className="flex flex-wrap gap-4 mt-4 pt-3 border-t border-earth-border/60 text-[11px] text-earth-text/60 font-mono">
                           <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-earth-accent" />{act.time} ({act.duration})</span>
-                          <span className="flex items-center gap-1"><DollarSign className="w-3.5 h-3.5 text-earth-sage" />Cost: ${act.cost}</span>
+                          <span className="flex items-center gap-1"><DollarSign className="w-3.5 h-3.5 text-earth-sage" />Cost: {formatPrice(act.cost, trip.country)}</span>
                           <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-earth-dark" />{act.location.name}</span>
                         </div>
                       </div>
@@ -496,7 +555,7 @@ export default function ItineraryView({ trip, onToggleFavorite, onAddExpense }: 
 
                         <div className="flex flex-wrap gap-4 mt-4 pt-3 border-t border-earth-border/60 text-[11px] text-earth-text/60 font-mono">
                           <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-earth-accent" />{act.time} ({act.duration})</span>
-                          <span className="flex items-center gap-1"><DollarSign className="w-3.5 h-3.5 text-earth-sage" />Cost: ${act.cost}</span>
+                          <span className="flex items-center gap-1"><DollarSign className="w-3.5 h-3.5 text-earth-sage" />Cost: {formatPrice(act.cost, trip.country)}</span>
                           <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-earth-dark" />{act.location.name}</span>
                         </div>
                       </div>
@@ -532,7 +591,7 @@ export default function ItineraryView({ trip, onToggleFavorite, onAddExpense }: 
 
                         <div className="flex flex-wrap gap-4 mt-4 pt-3 border-t border-earth-border/60 text-[11px] text-earth-text/60 font-mono">
                           <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-earth-accent" />{act.time} ({act.duration})</span>
-                          <span className="flex items-center gap-1"><DollarSign className="w-3.5 h-3.5 text-earth-sage" />Cost: ${act.cost}</span>
+                          <span className="flex items-center gap-1"><DollarSign className="w-3.5 h-3.5 text-earth-sage" />Cost: {formatPrice(act.cost, trip.country)}</span>
                           <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-earth-dark" />{act.location.name}</span>
                         </div>
                       </div>
@@ -578,6 +637,34 @@ export default function ItineraryView({ trip, onToggleFavorite, onAddExpense }: 
       {/* Weather tab */}
       {activeTab === 'weather' && (
         <div className="space-y-6">
+          {trip.isMulticity && trip.weatherList && trip.weatherList.length > 0 && (
+            <div className="p-6 rounded-[32px] bg-gradient-to-r from-amber-50/20 to-white border border-earth-border space-y-4 shadow-sm">
+              <h3 className="font-serif italic font-light text-earth-text text-xl">Multi-City Weather Overview</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {trip.weatherList.map((w: any, idx: number) => (
+                  <div key={idx} className="p-4 rounded-2xl bg-white border border-earth-border/60 flex items-center justify-between gap-4 shadow-xs">
+                    <div>
+                      <span className="text-[10px] font-mono text-earth-accent uppercase tracking-wider block">City #{idx+1}</span>
+                      <strong className="font-serif italic text-base text-earth-text block truncate max-w-[130px]">{w.city || `Destination ${idx+1}`}</strong>
+                      <span className="text-xs text-earth-text/60 block capitalize">{w.condition || "Clear"}</span>
+                    </div>
+                    <div className="text-right flex items-center gap-2">
+                      {w.condition?.toLowerCase().includes("rain") ? (
+                        <CloudRain className="w-8 h-8 text-blue-400" />
+                      ) : (
+                        <Sun className="w-8 h-8 text-amber-500 animate-spin-slow" />
+                      )}
+                      <div>
+                        <strong className="text-lg font-semibold text-earth-dark block">{w.temp || 22}°C</strong>
+                        <span className="text-[9px] font-mono text-earth-text/40">Feels {w.feelsLike || 22}°C</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Main Weather Card */}
           <div className="p-6 rounded-[32px] bg-white border border-earth-border grid grid-cols-1 md:grid-cols-12 gap-6 shadow-sm">
             <div className="md:col-span-4 flex flex-col justify-center items-center md:items-start space-y-4 border-b md:border-b-0 md:border-r border-earth-border/50 pb-6 md:pb-0 md:pr-6">

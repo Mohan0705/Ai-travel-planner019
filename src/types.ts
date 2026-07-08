@@ -115,6 +115,7 @@ export interface Trip {
   interests: string[];
   isSaved: boolean;
   isFavorite: boolean;
+  status?: string;
   itinerary: DayPlan[];
   expenses: Expense[];
   hotels?: HotelRecommendation[];
@@ -130,6 +131,11 @@ export interface Trip {
   savingTips?: string[];
   safetyTips?: string[];
   createdAt: string;
+  isMulticity?: boolean;
+  totalDistance?: number;
+  totalDuration?: string;
+  weatherList?: any[];
+  segments?: any[];
 }
 
 export interface WeatherInfo {

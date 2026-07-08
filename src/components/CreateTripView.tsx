@@ -99,6 +99,11 @@ export default function CreateTripView({ onTripGenerated, initialDestination = "
   const [transport, setTransport] = React.useState(TRANSPORTS[3]);
   const [interests, setInterests] = React.useState<string[]>([]);
   
+  // Multi-City Planner States
+  const [plannerMode, setPlannerMode] = React.useState<"single" | "multi">("single");
+  const [multicityDestinations, setMulticityDestinations] = React.useState<string[]>(["Delhi", "Agra", "Jaipur"]);
+  const [draggedIdx, setDraggedIdx] = React.useState<number | null>(null);
+
   // App states
   const [loading, setLoading] = React.useState(false);
   const [loadingStepIdx, setLoadingStepIdx] = React.useState(0);
@@ -208,6 +213,150 @@ export default function CreateTripView({ onTripGenerated, initialDestination = "
     );
   };
 
+  // Multi-city Helpers
+  const handleDragStart = (idx: number) => {
+    setDraggedIdx(idx);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (idx: number) => {
+    if (draggedIdx === null) return;
+    const list = [...multicityDestinations];
+    const item = list[draggedIdx];
+    list.splice(draggedIdx, 1);
+    list.splice(idx, 0, item);
+    setMulticityDestinations(list);
+    setDraggedIdx(null);
+  };
+
+  const handleMoveUp = (idx: number) => {
+    if (idx === 0) return;
+    const list = [...multicityDestinations];
+    const temp = list[idx];
+    list[idx] = list[idx - 1];
+    list[idx - 1] = temp;
+    setMulticityDestinations(list);
+  };
+
+  const handleMoveDown = (idx: number) => {
+    if (idx === multicityDestinations.length - 1) return;
+    const list = [...multicityDestinations];
+    const temp = list[idx];
+    list[idx] = list[idx + 1];
+    list[idx + 1] = temp;
+    setMulticityDestinations(list);
+  };
+
+  const handleAddCity = () => {
+    setMulticityDestinations([...multicityDestinations, ""]);
+  };
+
+  const handleRemoveCity = (idx: number) => {
+    setMulticityDestinations(multicityDestinations.filter((_, i) => i !== idx));
+  };
+
+  const handleCityChange = (idx: number, val: string) => {
+    const list = [...multicityDestinations];
+    list[idx] = val;
+    setMulticityDestinations(list);
+  };
+
+  const optimizeRouteAI = async () => {
+    const validDests = multicityDestinations.filter(c => c.trim().length > 0);
+    if (validDests.length < 2) {
+      setValidationError("Please add at least 2 destinations to run route optimization.");
+      return;
+    }
+    if (!startingLocation.trim()) {
+      setValidationError("Starting Location is required to optimize the route from.");
+      return;
+    }
+    setValidationError("");
+    setLoading(true);
+    setLoadingStepIdx(1); // Spatial coordinator plotting geographical coordinates...
+    
+    try {
+      // 1. Geocode starting location
+      const startRes = await fetch(`${API_BASE}/api/geocode/search?q=${encodeURIComponent(startingLocation)}`);
+      let startLat = 17.3850;
+      let startLng = 78.4867; // Default Hyderabad fallback
+      if (startRes.ok) {
+        const data = await startRes.json();
+        if (data && data.length > 0) {
+          startLat = parseFloat(data[0].lat || "17.3850");
+          startLng = parseFloat(data[0].lon || "78.4867");
+        }
+      }
+      
+      // 2. Geocode all destinations
+      const coordsList = await Promise.all(
+        validDests.map(async (city) => {
+          try {
+            const res = await fetch(`${API_BASE}/api/geocode/search?q=${encodeURIComponent(city)}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.length > 0) {
+                return { city, lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+              }
+            }
+          } catch (e) {
+            console.warn("Geocoding city failed for TSP optimizer:", e);
+          }
+          // Fallback synthetic coordinates using simple hash code
+          let hash = 0;
+          for (let i = 0; i < city.length; i++) {
+            hash = city.charCodeAt(i) + ((hash << 5) - hash);
+          }
+          const lat = 10 + (Math.abs(hash % 500) / 10);
+          const lng = 70 + (Math.abs((hash >> 3) % 40) / 10);
+          return { city, lat, lng };
+        })
+      );
+      
+      // 3. Nearest Neighbor TSP algorithm starting from startLat, startLng
+      const unvisited = [...coordsList];
+      const optimized: string[] = [];
+      let currentLat = startLat;
+      let currentLng = startLng;
+      
+      const calculateDistance = (la1: number, ln1: number, la2: number, ln2: number) => {
+        const R = 6371;
+        const dLat = ((la2 - la1) * Math.PI) / 180;
+        const dLng = ((ln2 - ln1) * Math.PI) / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos((la1 * Math.PI) / 180) * Math.cos((la2 * Math.PI) / 180) *
+                  Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      };
+      
+      while (unvisited.length > 0) {
+        let bestIdx = 0;
+        let minDistance = Infinity;
+        for (let i = 0; i < unvisited.length; i++) {
+          const d = calculateDistance(currentLat, currentLng, unvisited[i].lat, unvisited[i].lng);
+          if (d < minDistance) {
+            minDistance = d;
+            bestIdx = i;
+          }
+        }
+        const nextNode = unvisited.splice(bestIdx, 1)[0];
+        optimized.push(nextNode.city);
+        currentLat = nextNode.lat;
+        currentLng = nextNode.lng;
+      }
+      
+      setMulticityDestinations(optimized);
+    } catch (error) {
+      console.error("AI Route optimization failed:", error);
+      setValidationError("Route optimization failed. Reordered list manually or try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError("");
@@ -217,10 +366,22 @@ export default function CreateTripView({ onTripGenerated, initialDestination = "
       setValidationError("Starting Location is required. Please enter a city or airport manually.");
       return;
     }
-    if (!destination.trim()) {
+
+    const isMulticity = plannerMode === "multi";
+    const validDestinations = isMulticity 
+      ? multicityDestinations.filter(d => d.trim().length > 0)
+      : [destination.trim()];
+
+    if (!isMulticity && !destination.trim()) {
       setValidationError("Destination location is required.");
       return;
     }
+
+    if (isMulticity && validDestinations.length === 0) {
+      setValidationError("At least one destination city is required.");
+      return;
+    }
+
     if (!startDate || !endDate) {
       setValidationError("Please select both start and end dates.");
       return;
@@ -233,7 +394,22 @@ export default function CreateTripView({ onTripGenerated, initialDestination = "
     setLoading(true);
     setLoadingStepIdx(0);
 
-    const payload = {
+    const endpoint = isMulticity ? "/api/itinerary/generate-multicity" : "/api/itinerary/generate";
+    const payload = isMulticity ? {
+      startingLocation: startingLocation.trim(),
+      destinations: validDestinations,
+      budget: Number(budget) || 1500,
+      currency,
+      startDate,
+      endDate,
+      travelers,
+      children,
+      travelStyle,
+      foodPreference,
+      hotelPreference,
+      transport,
+      interests
+    } : {
       startingLocation: startingLocation.trim(),
       destination: destination.trim(),
       country: country.trim() || "International",
@@ -251,7 +427,7 @@ export default function CreateTripView({ onTripGenerated, initialDestination = "
     };
 
     try {
-      const response = await fetch(`${API_BASE}/api/itinerary/generate`, {
+      const response = await fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -265,9 +441,9 @@ export default function CreateTripView({ onTripGenerated, initialDestination = "
       
       const newTrip: Trip = {
         id: `trip-${Date.now()}`,
-        destination: payload.destination,
+        destination: isMulticity ? validDestinations.join(" → ") : (payload as any).destination,
         startingLocation: payload.startingLocation,
-        country: payload.country,
+        country: isMulticity ? "Multi-City Route" : (payload as any).country,
         startDate: payload.startDate,
         endDate: payload.endDate,
         travelers: payload.travelers,
@@ -285,7 +461,9 @@ export default function CreateTripView({ onTripGenerated, initialDestination = "
         expenses: [],
         hotels: generatedData.hotels || [],
         restaurants: generatedData.restaurants || [],
-        weather: generatedData.weather || null,
+        weather: isMulticity 
+          ? (generatedData.weather && generatedData.weather.length > 0 ? generatedData.weather[0] : null)
+          : (generatedData.weather || null),
         flights: generatedData.flights || [],
         localTransport: generatedData.localTransport || null,
         trains: generatedData.trains || [],
@@ -295,7 +473,12 @@ export default function CreateTripView({ onTripGenerated, initialDestination = "
         packingTips: generatedData.packingTips || [],
         savingTips: generatedData.savingTips || [],
         safetyTips: generatedData.safetyTips || [],
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        isMulticity,
+        totalDistance: generatedData.totalDistance,
+        totalDuration: generatedData.totalDuration,
+        weatherList: isMulticity ? generatedData.weather : undefined,
+        segments: isMulticity ? generatedData.segments : undefined
       };
 
       onTripGenerated(newTrip);
@@ -401,33 +584,177 @@ export default function CreateTripView({ onTripGenerated, initialDestination = "
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-earth-text/80">Destination City</label>
-                <div className="relative">
-                  <MapPin className="w-4 h-4 text-earth-sage absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input 
-                    id="form-destination"
-                    type="text"
-                    required
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                    placeholder="E.g., Kyoto, London, New York..."
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-white border border-earth-border text-earth-text focus:ring-1 focus:ring-earth-accent/30 focus:border-earth-accent/50 focus:outline-none text-sm font-medium"
-                  />
+              {/* Planning Strategy Toggle */}
+              <div className="md:col-span-2 space-y-2">
+                <label className="text-xs font-semibold text-earth-text/80">Planning Strategy</label>
+                <div className="flex gap-4 p-1.5 rounded-2xl bg-[#F5F5F0] border border-earth-border max-w-md">
+                  <button
+                    type="button"
+                    onClick={() => setPlannerMode("single")}
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-mono font-medium transition-all cursor-pointer ${
+                      plannerMode === "single"
+                        ? "bg-[#5F5E4E] text-white shadow"
+                        : "text-earth-text/60 hover:text-earth-text"
+                    }`}
+                  >
+                    🗺️ Single Destination
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlannerMode("multi")}
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-mono font-medium transition-all cursor-pointer ${
+                      plannerMode === "multi"
+                        ? "bg-earth-accent text-white shadow"
+                        : "text-earth-text/60 hover:text-earth-text"
+                    }`}
+                  >
+                    ⭐ Multi-City Route
+                  </button>
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-earth-text/80">Country (Optional)</label>
-                <input 
-                  id="form-country"
-                  type="text"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  placeholder="E.g., Japan, United Kingdom..."
-                  className="w-full px-4 py-3 rounded-xl bg-white border border-earth-border text-earth-text focus:ring-1 focus:ring-earth-accent/30 focus:border-earth-accent/50 focus:outline-none text-sm font-medium"
-                />
-              </div>
+              {plannerMode === "single" ? (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-earth-text/80">Destination City</label>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 text-earth-sage absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input 
+                        id="form-destination"
+                        type="text"
+                        required={plannerMode === "single"}
+                        value={destination}
+                        onChange={(e) => setDestination(e.target.value)}
+                        placeholder="E.g., Kyoto, London, New York..."
+                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-white border border-earth-border text-earth-text focus:ring-1 focus:ring-earth-accent/30 focus:border-earth-accent/50 focus:outline-none text-sm font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-earth-text/80">Country (Optional)</label>
+                    <input 
+                      id="form-country"
+                      type="text"
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      placeholder="E.g., Japan, United Kingdom..."
+                      className="w-full px-4 py-3 rounded-xl bg-white border border-earth-border text-earth-text focus:ring-1 focus:ring-earth-accent/30 focus:border-earth-accent/50 focus:outline-none text-sm font-medium"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="md:col-span-2 space-y-4 p-5 rounded-2xl bg-[#FAF9F5]/80 border border-earth-border/60">
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-mono text-[#4A4A3A] uppercase font-medium">Quick Path Presets</span>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStartingLocation("Delhi");
+                          setMulticityDestinations(["Agra", "Jaipur", "Mumbai", "Goa", "Kerala"]);
+                        }}
+                        className="px-3 py-1.5 rounded-xl border border-earth-border bg-[#F5F5F0] hover:bg-white text-xs font-medium text-earth-text/80 transition-all cursor-pointer"
+                      >
+                        🇮🇳 Golden Triangle & South (Delhi → Kerala)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStartingLocation("Hyderabad");
+                          setMulticityDestinations(["Bangalore", "Mysore", "Coorg", "Goa"]);
+                        }}
+                        className="px-3 py-1.5 rounded-xl border border-earth-border bg-[#F5F5F0] hover:bg-white text-xs font-medium text-earth-text/80 transition-all cursor-pointer"
+                      >
+                        🌴 South India Explorer (Hyderabad → Goa)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-semibold text-earth-text/80">Destinations Array <span className="text-red-500">*</span></label>
+                      <button
+                        type="button"
+                        onClick={optimizeRouteAI}
+                        className="px-3 py-1.5 rounded-lg bg-earth-sage/15 hover:bg-earth-sage/30 text-[10px] font-mono text-earth-dark flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Optimize Route (AI TSP)
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                      {multicityDestinations.map((city, idx) => (
+                        <div
+                          key={idx}
+                          draggable
+                          onDragStart={() => handleDragStart(idx)}
+                          onDragOver={handleDragOver}
+                          onDrop={() => handleDrop(idx)}
+                          className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                            draggedIdx === idx 
+                              ? "border-earth-accent bg-[#FAF9F5] opacity-50" 
+                              : "border-earth-border bg-white"
+                          }`}
+                        >
+                          <div className="cursor-grab text-earth-text/30 hover:text-earth-text/60 select-none font-mono text-xs">
+                            ⠿
+                          </div>
+                          
+                          <span className="text-[10px] font-mono font-medium text-[#4A4A3A]/60 w-5">
+                            #{idx + 1}
+                          </span>
+                          
+                          <input
+                            type="text"
+                            required
+                            value={city}
+                            onChange={(e) => handleCityChange(idx, e.target.value)}
+                            placeholder={`Destination City #${idx + 1}`}
+                            className="flex-1 px-3 py-1.5 rounded-lg bg-[#FAF9F5]/40 border border-earth-border/60 text-earth-text text-xs font-medium focus:outline-none focus:ring-1 focus:ring-earth-accent/30"
+                          />
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleMoveUp(idx)}
+                              disabled={idx === 0}
+                              className="p-1 rounded text-earth-text/40 hover:text-earth-text disabled:opacity-20 cursor-pointer"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveDown(idx)}
+                              disabled={idx === multicityDestinations.length - 1}
+                              className="p-1 rounded text-earth-text/40 hover:text-earth-text disabled:opacity-20 cursor-pointer"
+                            >
+                              ▼
+                            </button>
+                            {multicityDestinations.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCity(idx)}
+                                className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAddCity}
+                      className="w-full py-2 border border-dashed border-earth-border hover:border-earth-accent/65 rounded-xl text-xs font-mono text-[#4A4A3A]/70 hover:text-earth-accent transition-all cursor-pointer"
+                    >
+                      + Add Destination City
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-earth-text/80">Departure Date</label>

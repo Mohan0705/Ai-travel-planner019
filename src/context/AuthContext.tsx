@@ -109,21 +109,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let mounted = true;
 
     // Get current session
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       if (!mounted) return;
       setSession(initialSession);
       const sUser = initialSession?.user ?? null;
       setSupabaseUser(sUser);
 
       if (sUser) {
-        fetchProfile(sUser).then((profile) => {
+        try {
+          const profile = await fetchProfile(sUser);
           if (mounted) {
             setCurrentUser(profile);
+          }
+        } catch (err) {
+          console.error("Initial session profile setup failed gracefully:", err);
+        } finally {
+          if (mounted) {
             setLoading(false);
           }
-        });
+        }
       } else {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     });
 
@@ -136,14 +144,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (sUser) {
         setLoading(true);
-        const profile = await fetchProfile(sUser);
-        if (mounted) {
-          setCurrentUser(profile);
-          setLoading(false);
+        try {
+          const profile = await fetchProfile(sUser);
+          if (mounted) {
+            setCurrentUser(profile);
+          }
+        } catch (err) {
+          console.error("Auth state change profile setup failed gracefully:", err);
+        } finally {
+          if (mounted) {
+            setLoading(false);
+          }
         }
       } else {
         setCurrentUser(null);
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     });
 

@@ -20,12 +20,18 @@ export default function CloudLayer() {
         
         .cloud-slow {
           animation: cloud-drift-slow 160s linear infinite;
+          will-change: transform;
+          backface-visibility: hidden;
         }
         .cloud-medium {
           animation: cloud-drift-medium 110s linear infinite;
+          will-change: transform;
+          backface-visibility: hidden;
         }
         .cloud-fast {
           animation: cloud-drift-fast 70s linear infinite;
+          will-change: transform;
+          backface-visibility: hidden;
         }
 
         @media (prefers-reduced-motion: reduce) {
