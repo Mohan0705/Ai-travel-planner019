@@ -31,7 +31,8 @@ import {
   Utensils,
   Camera,
   ShoppingBag,
-  HelpCircle
+  HelpCircle,
+  Bookmark
 } from "lucide-react";
 import { Trip, WeatherInfo } from "../types";
 import { PRESET_TIPS } from "../dataStore";
@@ -73,7 +74,7 @@ export default function DashboardView({
   const [budgetFilter, setBudgetFilter] = React.useState("all");
   const [travelStyleFilter, setTravelStyleFilter] = React.useState("all");
   const [sortBy, setSortBy] = React.useState<"latest" | "oldest" | "budget" | "duration">("latest");
-  const [activeStatusTab, setActiveStatusTab] = React.useState<"all" | "upcoming" | "current" | "completed" | "cancelled" | "archived">("all");
+  const [activeStatusTab, setActiveStatusTab] = React.useState<"all" | "saved" | "upcoming" | "current" | "completed" | "cancelled" | "archived">("all");
 
   // INLINE EDITING STATE
   const [editingTrip, setEditingTrip] = React.useState<Trip | null>(null);
@@ -225,8 +226,12 @@ export default function DashboardView({
         // Status tab
         let matchesStatusTab = true;
         if (activeStatusTab !== "all") {
-          const currentStatus = t.status || "upcoming";
-          matchesStatusTab = currentStatus === activeStatusTab;
+          if (activeStatusTab === "saved") {
+            matchesStatusTab = t.isSaved === true;
+          } else {
+            const currentStatus = t.status || "upcoming";
+            matchesStatusTab = currentStatus === activeStatusTab;
+          }
         }
 
         return matchesSearch && matchesCountry && matchesStyle && matchesBudget && matchesStatusTab;
@@ -527,20 +532,31 @@ export default function DashboardView({
         
         {/* Status Filters Bar */}
         <div className="border-b border-earth-border/70 flex items-center gap-1 overflow-x-auto pb-px">
-          {(["all", "upcoming", "current", "completed", "cancelled", "archived"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveStatusTab(tab)}
-              className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap cursor-pointer
-                ${activeStatusTab === tab 
-                  ? "border-earth-accent text-earth-accent font-bold" 
-                  : "border-transparent text-earth-text/50 hover:text-earth-text"
-                }
-              `}
-            >
-              {tab === "all" ? "My Journeys (All)" : tab}
-            </button>
-          ))}
+          {(["all", "saved", "upcoming", "current", "completed", "cancelled", "archived"] as const).map((tab) => {
+            const labels: Record<string, string> = {
+              all: "All Journeys",
+              saved: "💾 Saved Bookmarks",
+              upcoming: "🚀 Upcoming / Planned",
+              current: "🌍 Active Journey",
+              completed: "🕰️ Past / Completed",
+              cancelled: "❌ Cancelled",
+              archived: "📦 Archived"
+            };
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveStatusTab(tab)}
+                className={`px-4 py-2.5 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap cursor-pointer
+                  ${activeStatusTab === tab 
+                    ? "border-earth-accent text-earth-accent font-bold" 
+                    : "border-transparent text-earth-text/50 hover:text-earth-text"
+                  }
+                `}
+              >
+                {labels[tab] || tab}
+              </button>
+            );
+          })}
         </div>
 
         {/* Search, Filter & Sort Bento Bar */}
@@ -664,20 +680,45 @@ export default function DashboardView({
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                       
-                      {/* Favorite button */}
-                      <button 
-                        id={`fav-btn-${t.id}`}
-                        onClick={(e) => { e.stopPropagation(); onToggleFavorite(t.id); }}
-                        className={`absolute top-4 right-4 p-2.5 rounded-full backdrop-blur-md border transition-all cursor-pointer
-                          ${t.isFavorite 
-                            ? "bg-rose-500/90 border-rose-400 text-white fill-current" 
-                            : "bg-black/35 border-white/20 text-white/80 hover:bg-black/50"
-                          }
-                        `}
-                        title="Favorite"
-                      >
-                        <Heart className="w-4 h-4" />
-                      </button>
+                      {/* Action buttons (Favorite & Save) */}
+                      <div className="absolute top-4 right-4 flex gap-2">
+                        {/* Save (isSaved) button */}
+                        <button 
+                          id={`save-btn-${t.id}`}
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            if (onUpdateTrip) {
+                              onUpdateTrip(t.id, { isSaved: !t.isSaved });
+                            } else {
+                              t.isSaved = !t.isSaved;
+                            }
+                          }}
+                          className={`p-2.5 rounded-full backdrop-blur-md border transition-all cursor-pointer
+                            ${t.isSaved 
+                              ? "bg-earth-accent border-earth-accent text-white fill-current" 
+                              : "bg-black/35 border-white/20 text-white/80 hover:bg-black/50"
+                            }
+                          `}
+                          title={t.isSaved ? "Saved Bookmark" : "Save Bookmark"}
+                        >
+                          <Bookmark className="w-4 h-4" />
+                        </button>
+
+                        {/* Favorite button */}
+                        <button 
+                          id={`fav-btn-${t.id}`}
+                          onClick={(e) => { e.stopPropagation(); onToggleFavorite(t.id); }}
+                          className={`p-2.5 rounded-full backdrop-blur-md border transition-all cursor-pointer
+                            ${t.isFavorite 
+                              ? "bg-rose-500/90 border-rose-400 text-white fill-current" 
+                              : "bg-black/35 border-white/20 text-white/80 hover:bg-black/50"
+                            }
+                          `}
+                          title="Favorite"
+                        >
+                          <Heart className="w-4 h-4" />
+                        </button>
+                      </div>
 
                       {/* Status and Countdown Badges */}
                       <div className="absolute top-4 left-4 flex flex-col gap-1.5 items-start">

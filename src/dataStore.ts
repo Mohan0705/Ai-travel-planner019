@@ -18,6 +18,7 @@ export const PRESET_KYOTO: Trip = {
   interests: ["Temples", "Gardens", "Tea Ceremony", "Gastronomy", "History"],
   isSaved: true,
   isFavorite: true,
+  status: "completed",
   createdAt: "2026-03-01T12:00:00Z",
   expenses: [
     { id: "exp-k1", title: "Luxury Ryokan Stay", amount: 1800, category: "hotel", date: "2026-04-02", description: "Traditional tatami suite with private onsen." },

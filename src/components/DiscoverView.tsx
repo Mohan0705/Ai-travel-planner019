@@ -196,24 +196,7 @@ export default function DiscoverView({ onPlanTrip, onLoadPreset }: DiscoverViewP
         </div>
       </section>
 
-      {/* FAQ Panel */}
-      <section className="py-20 px-6 max-w-3xl mx-auto space-y-12 border-t border-earth-border">
-        <div className="text-center space-y-2">
-          <h2 className="font-serif italic font-light text-3xl text-earth-text tracking-tight">Frequently Answered Queries</h2>
-          <p className="text-earth-text/50 text-sm">Everything you need to know about our smart concierge platform.</p>
-        </div>
-        <div className="space-y-4">
-          {FAQS.map((faq, idx) => (
-            <div key={idx} className="p-6 rounded-[32px] bg-white border border-earth-border space-y-3 shadow-sm">
-              <div className="flex items-start gap-3">
-                <HelpCircle className="w-5 h-5 text-earth-accent shrink-0 mt-0.5" />
-                <h3 className="font-serif italic text-earth-text text-base">{faq.q}</h3>
-              </div>
-              <p className="text-earth-text/75 text-xs font-light leading-relaxed pl-8">{faq.a}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+
 
       {/* Simple elegant Footer */}
       <footer className="py-12 bg-earth-dark text-[#E6E1D3] border-t border-earth-border/20 text-center text-xs font-mono">

@@ -98,6 +98,7 @@ export default function CreateTripView({ onTripGenerated, initialDestination = "
   const [hotelPreference, setHotelPreference] = React.useState(HOTEL_PREFERENCES[1]);
   const [transport, setTransport] = React.useState(TRANSPORTS[3]);
   const [interests, setInterests] = React.useState<string[]>([]);
+  const [tripTiming, setTripTiming] = React.useState<"upcoming" | "completed">("upcoming");
   
   // Multi-City Planner States
   const [plannerMode, setPlannerMode] = React.useState<"single" | "multi">("single");
@@ -457,6 +458,7 @@ export default function CreateTripView({ onTripGenerated, initialDestination = "
         interests: payload.interests,
         isSaved: true,
         isFavorite: false,
+        status: tripTiming,
         itinerary: generatedData.itinerary || [],
         expenses: [],
         hotels: generatedData.hotels || [],
@@ -783,6 +785,34 @@ export default function CreateTripView({ onTripGenerated, initialDestination = "
                     onChange={(e) => setEndDate(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 rounded-xl bg-white border border-earth-border text-earth-text focus:ring-1 focus:ring-earth-accent/30 focus:border-earth-accent/50 focus:outline-none text-sm font-medium"
                   />
+                </div>
+              </div>
+
+              <div className="md:col-span-2 space-y-2">
+                <label className="text-xs font-semibold text-earth-text/80">Voyage Timing Phase</label>
+                <div className="flex gap-4 p-1.5 rounded-2xl bg-[#F5F5F0] border border-earth-border max-w-md">
+                  <button
+                    type="button"
+                    onClick={() => setTripTiming("upcoming")}
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-mono font-medium transition-all cursor-pointer ${
+                      tripTiming === "upcoming"
+                        ? "bg-[#5F5E4E] text-white shadow"
+                        : "text-earth-text/60 hover:text-earth-text"
+                    }`}
+                  >
+                    🚀 Upcoming / Planned
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTripTiming("completed")}
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-mono font-medium transition-all cursor-pointer ${
+                      tripTiming === "completed"
+                        ? "bg-earth-olive text-white shadow"
+                        : "text-earth-text/60 hover:text-earth-text"
+                    }`}
+                  >
+                    🕰️ Past / Completed
+                  </button>
                 </div>
               </div>
 
